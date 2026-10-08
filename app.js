@@ -34,6 +34,8 @@ const argv = yarg_.usage('Usage: $0 --username "johndoe" --websites "youtube tik
   .describe('docker', 'allow docker')
   .default('docker', false)
   .boolean('docker')
+  .describe('host', 'Interface to bind the web app to (default 0.0.0.0)')
+  .default('host', '')
   .describe('method', 'find -> show detected profiles, get -> show all profiles regardless detected or not, all -> combine find & get')
   .default('method', 'all')
   .describe('grid', 'grid option, not for CLI')
@@ -101,13 +103,19 @@ import stringAnalysis from './modules/string-analysis.js'
 import nameAnalysis from './modules/name-analysis.js'
 import visualize from './modules/visualize.js'
 import stats from './modules/stats.js'
+import gateway from './modules/gateway.js'
 
 const app = express()
 app.set('etag', false)
 app.use(express.urlencoded({
-  extended: true
+  extended: true,
+  limit: '2mb'
 }))
-app.use(express.json())
+app.use(express.json({
+  limit: '2mb'
+}))
+// Head Hunter Agency console + REST API (mounted before static assets)
+gateway.attach(app)
 app.use(express.static('public'))
 
 app.post('/get_logs', async function (req, res, next) {
@@ -813,7 +821,7 @@ async function list_all_websites () {
   console.log('[Listing] Available websites\n' + temp_arr.join('\n'))
 }
 
-let server_host = 'localhost'
+let server_host = process.env.HOST || '0.0.0.0'
 const server_port = process.env.PORT || 9005
 
 if (argv.grid !== '') {
@@ -822,10 +830,18 @@ if (argv.grid !== '') {
 if (argv.docker) {
   server_host = '0.0.0.0'
 }
+if (argv.host !== '') {
+  server_host = argv.host
+}
 if (argv.gui) {
   app.listen(server_port, server_host, function () {
     // helper.setup_tecert()
-    console.log('Server started at http://%s:%s/app.html', server_host, server_port)
+    console.log('')
+    console.log('  ' + gateway.APP_NAME + ' — ' + gateway.APP_TAGLINE)
+    console.log('  Console : http://%s:%s/', server_host, server_port)
+    console.log('  Classic : http://%s:%s/app.html', server_host, server_port)
+    console.log('  API     : http://%s:%s/api/health', server_host, server_port)
+    console.log('')
   })
 } else {
   if (argv.list) {
